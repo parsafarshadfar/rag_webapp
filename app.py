@@ -2,8 +2,7 @@ __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import chromadb 
-### uncomment the following code if you are facing chromadb error in your pc
-# chromadb.api.client.SharedSystemClient.clear_system_cache()
+chromadb.api.client.SharedSystemClient.clear_system_cache()
 
 import os
 import streamlit as st
