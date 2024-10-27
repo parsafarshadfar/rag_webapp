@@ -1,7 +1,7 @@
 pypdf
 streamlit==1.39.0  
 pysqlite3-binary
-huggingface_hub==0.21.3
+huggingface_hub
 langchain==0.1.111
 langchain_community==0.0.25
 langchain_core==0.1.29
