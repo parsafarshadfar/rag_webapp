@@ -23,9 +23,13 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 
+
+# fix the issues of chroma and sqlite3 on the cloud
 import chromadb
 chromadb.api.client.SharedSystemClient.clear_system_cache()
-
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 
 #setting streamlit main page configration
