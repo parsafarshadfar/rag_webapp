@@ -1,0 +1,7 @@
+pypdf
+chromadb
+streamlit==1.39.0  
+langchain
+langchain-core
+langchain-community
+langchain_text_splitters
