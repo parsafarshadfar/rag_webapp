@@ -1,6 +1,7 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+__import__('pysqlite3') ## line 1 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+import sys ## line 2 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3') ## line 3 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+
 import chromadb 
 chromadb.api.client.SharedSystemClient.clear_system_cache()
 
