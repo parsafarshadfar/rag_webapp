@@ -1,10 +1,10 @@
 
-# RAG Web Application (Try it: https://whisperingpages.streamlit.app/)
+# RAG Web Application 
 
 This project is a conversational chatbot application built with **Streamlit** and powered by the **Zephyr-7B-α** language model. The chatbot can engage users in informative and dynamic conversations, using both text and structured data from uploaded PDF documents as context.
 
 ![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
-
+(Try it: https://whisperingpages.streamlit.app/)
 ### Overview
 
 This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser.
