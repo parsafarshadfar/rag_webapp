@@ -31,7 +31,7 @@ To set up and run this application, follow these steps:
 
 1. **Clone the Repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/parsafarshadfar/rag_webapp.git
    ```
 
 2. **Install Dependencies**  
@@ -41,9 +41,10 @@ To set up and run this application, follow these steps:
    ```
 
 3. **Set up Hugging Face API Token**
+
    Replace HF_TOKEN value in the code with your Hugging Face API token. You can obtain an API token [**here**](https://huggingface.co/settings/tokens/). 
 
-4. **Run the Application**
+5. **Run the Application**
    Start the Streamlit app:
    ```bash
    streamlit run app.py
