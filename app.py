@@ -1,15 +1,13 @@
+__import__('pysqlite3')
+import sys # fix the issues of chroma and sqlite3 on the cloud
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+import chromadb
+chromadb.api.client.SharedSystemClient.clear_system_cache()
+
 import os
 import streamlit as st
 import time
-
-# fix the issues of chroma and sqlite3 on the cloud
-import chromadb
-chromadb.api.client.SharedSystemClient.clear_system_cache()
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
-
 import tempfile
 import shutil
 import hashlib
