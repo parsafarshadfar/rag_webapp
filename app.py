@@ -1,8 +1,9 @@
 __import__('pysqlite3')
-import pysqlite3
-sys.modules['sqlite3'] = sys.modules["pysqlite3"]
-import chromadb
+import sys # fix the issues of chroma and sqlite3 on the cloud
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 ### uncomment the following code if you are facing chromadb error in your pc
+import chromadb
 # chromadb.api.client.SharedSystemClient.clear_system_cache()
 
 import os
