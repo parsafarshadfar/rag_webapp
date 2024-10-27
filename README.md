@@ -1,50 +1,65 @@
 
-# RAG Webapp
+# Chatbot Web Application
 
-This repository contains a Streamlit web application that serves as a retrieval-augmented generation (RAG) tool for PDF documents. The application leverages a language model to enable efficient querying of PDF content, providing a responsive and private environment for document analysis.
+This project is a conversational chatbot application built with **Streamlit** and powered by the **Zephyr-7B-α** language model. The chatbot can engage users in informative and dynamic conversations, using both text and structured data from uploaded PDF documents as context.
 
-## Features
-- **Local Document Analysis**: Upload PDF files to get extracted and analyzed content locally. Users can also drag and drop PDF files
-- **Retrieval-Augmented Generation (RAG)**: Combines document retrieval with generation for relevant, context-aware responses.
-- **Interactive Chat Interface**: Once a PDF is uploaded, users can input questions or prompts related to the document’s content, and the app provides responses based on the embedded document data. The app’s interface is designed for simplicity and functionality!
-- **temperature control** : 
-- **Tone control**:
-- **Download chat history**: download the chat history. it is in openAI syntax format.
+![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
 
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Model Information](#model-information)
+- [Setup and Installation](#setup-and-installation)
+---
 
-## Setup
+### Overview
 
-### Prerequisites
+This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser.
 
-- Python 3.8 or higher
+---
 
-### Installation
+### Features
 
-1. **Install Dependencies**:
+- **Role-Specific Tones**: Adjust the assistant’s tone with options like Friendly, Formal, Technical, and Concise for tailored responses.
+- **Customizable Temperature**: Modify the response creativity through temperature control, offering focused responses based on your PDF content. Note: lower the temperature for responses that adhere strictly to your PDF content.
+- **Session History Download**: Download your chat history in OpenAI’s JSON format, making it easy to keep records or analyze conversations.
+
+---
+
+### Model Information
+
+The core of this chatbot application is **Zephyr-7B-α**, a language model in the Zephyr series, specifically trained to serve as a helpful, conversational assistant. [**Zephyr-7B-α**](https://huggingface.co/HuggingFaceH4/zephyr-7b-alpha) is based on [**mistralai/Mistral-7B-v0.1**](https://huggingface.co/mistralai/Mistral-7B-v0.1) and fine-tuned on a combination of publicly available and synthetic datasets. 
+
+---
+
+### Setup and Installation
+
+To set up and run this application, follow these steps:
+
+1. **Clone the Repository**
+   ```bash
+   git clone <repository-url>
+   ```
+
+2. **Install Dependencies**  
+   Ensure you have Python 3.8+ installed. Install the required packages:
    ```bash
    pip install -r requirements.txt
    ```
 
-### Running the Application
+3. **Set up Hugging Face API Token**
+   Replace HF_TOKEN value in the code with your Hugging Face API token. You can obtain an API token [**here**](https://huggingface.co/settings/tokens/). 
 
-Start the Streamlit application by running:
-```bash
-streamlit run webapp.py
+4. **Run the Application**
+   Start the Streamlit app:
+   ```bash
+   streamlit run app.py
 
-or 
+   or 
 
-python3 -m streamlit run webapp.py
-```
+   python -m streamlit run app.py
+   ```
 
-This will launch the application on `http://localhost:8501`, where you can upload PDF files and query content locally.
+This will launch the application on `http://localhost:8501`, where you can upload PDF files and query content. The app can also be hosted on [Streamlit Cloud](https://share.streamlit.io/) or other cloud platforms like Azure, AWS, and more.
 
-
-![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
-
-## Usage
-
-1. **Upload PDFs**: Drag and drop PDF files directly into the web application.
-2. **Query the Document**: Enter a query in the text box, and the application will retrieve and generate responses based on the uploaded document's content.
-3. **Download Results**: Optionally download generated responses or processed text for further use.
-
-## Acknowledgments
+---
