@@ -44,10 +44,14 @@ To set up and run this application, follow these steps:
 
 3. **Set up Hugging Face API Token**
 
-   Replace HF_TOKEN value in the code with your Hugging Face API token. You can obtain a free API token [**here**](https://huggingface.co/settings/tokens/). 
-
-5. **Run the Application**
-   Start the Streamlit app:
+   Replace HF_TOKEN value in the code with your Hugging Face API token. You can obtain a free API token [**here**](https://huggingface.co/settings/tokens/).
+   
+4. **Local Usage Note**
+   
+   step 1, Comment the first three lines if you are using tha app locally.
+  
+   step 2, Start the Streamlit app:
+   
    ```bash
    streamlit run app.py
 
