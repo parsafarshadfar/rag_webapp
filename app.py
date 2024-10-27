@@ -282,6 +282,7 @@ if file_upload:
                 st.session_state["chat_history"].append(
                     {"role": "assistant", "content": response}
                 )
+                st.rerun()
 
         except Exception as e:
             st.error(e)
