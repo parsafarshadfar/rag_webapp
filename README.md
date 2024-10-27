@@ -5,13 +5,6 @@ This project is a conversational chatbot application built with **Streamlit** an
 
 ![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
 
-## Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Model Information](#model-information)
-- [Setup and Installation](#setup-and-installation)
----
-
 ### Overview
 
 This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser.
