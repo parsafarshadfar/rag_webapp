@@ -30,7 +30,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 
-
+#GithubIcon {
+  visibility: hidden;
+}
 
 #setting streamlit main page configration
 st.set_page_config(
