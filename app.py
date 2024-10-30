@@ -1,6 +1,7 @@
 __import__('pysqlite3') ## line 1 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
 import sys ## line 2 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3') ## line 3 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+GithubIcon {visibility: hidden;} #line 4 # to hide github icon
 
 import chromadb 
 chromadb.api.client.SharedSystemClient.clear_system_cache()
@@ -30,9 +31,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 
-#GithubIcon {
-  visibility: hidden;
-}
+
 
 #setting streamlit main page configration
 st.set_page_config(
