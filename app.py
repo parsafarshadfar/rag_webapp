@@ -287,19 +287,6 @@ if file_upload:
         except Exception as e:
             st.error(e)
 
-# hide the github icon from online app, optional
-st.markdown("""
-    <style>
-    .css-1jc7ptx, .e1ewe7hr3, .viewerBadge_container__1QSob,
-    .styles_viewerBadge__1yB5_, .viewerBadge_link__1S137,
-    .viewerBadge_text__1JaDK {
-        display: none;
-    }
-    </style>
-    """,unsafe_allow_html=True) #line 4 # remove github icon from online app
-
-
-
 
 
 
