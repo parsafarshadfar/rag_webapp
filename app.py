@@ -1,7 +1,15 @@
 __import__('pysqlite3') ## line 1 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
 import sys ## line 2 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3') ## line 3 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
-
+st.markdown("""
+    <style>
+    .css-1jc7ptx, .e1ewe7hr3, .viewerBadge_container__1QSob,
+    .styles_viewerBadge__1yB5_, .viewerBadge_link__1S137,
+    .viewerBadge_text__1JaDK {
+        display: none;
+    }
+    </style>
+    """,unsafe_allow_html=True) #line 4 # remove github icon from online app
 
 import chromadb 
 chromadb.api.client.SharedSystemClient.clear_system_cache()
