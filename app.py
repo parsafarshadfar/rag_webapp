@@ -45,7 +45,7 @@ st.set_page_config(
 ############################ LLM Model ###########################
 
 # hugging face model configration info:
-HF_TOKEN = st.secrets['API_TOKEN'] # add you hugging face token here, this line should be sth like this: HF_TOKEN ='hfra......sbhfasjfhJ'
+HF_TOKEN = st.secrets['API_TOKEN'] # add you hugging face token here
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
 embeddings = HuggingFaceInferenceAPIEmbeddings(
