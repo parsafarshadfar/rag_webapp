@@ -3,7 +3,7 @@
 
 This project is a conversational chatbot application built with **Streamlit** and powered by the **Zephyr-7B-α** language model. The chatbot can engage users in informative and dynamic conversations, using both text and structured data from uploaded PDF documents as context.
 
-Try my app: https://whisperingpdf.streamlit.app/
+Try my app: https://whisperingpdf.streamlit.app/ 
 
 ![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
 
