@@ -44,7 +44,7 @@ To set up and run this application, follow these steps:
 
 3. **Set up Hugging Face API Token**
 
-   Replace HF_TOKEN value in the code with your Hugging Face API token. You can obtain a free API token [**here**](https://huggingface.co/settings/tokens/).
+   Replace HF_TOKEN value in the code with your Hugging Face API token. 
    
 4. **Local Usage Note**
    
