@@ -7,7 +7,7 @@ langchain_core==0.3.13
 chromadb==0.5.*
 protobuf==3.20.3
 jupyter==1.1.1
-langchain-chroma
-langchain-huggingface
-pysqlite3-binary
+langchain-chroma==0.1.4
+langchain-huggingface==0.1.1
+pysqlite3-binary==0.5.4
 
