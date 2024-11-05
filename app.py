@@ -30,6 +30,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 #setting streamlit main page configration
