@@ -233,7 +233,7 @@ if delete_collection:
 
 
 # Download button to download chat history as JSON in OpenAI format
-if st.session_state.chat_history: # if there is a chat history:
+if st.session_state.get('chat_history', None) is not None: # if there is a chat history:
     
     chat_history_json = json.dumps(st.session_state.chat_history, indent=4) # create the json file
     
