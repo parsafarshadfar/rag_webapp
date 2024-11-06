@@ -315,10 +315,10 @@ with tab2:
     from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
     from langchain_core.prompts import MessagesPlaceholder
 
-    # system_prompt = SystemMessagePromptTemplate.from_template("You are a chatbot")
+    system_prompt = SystemMessagePromptTemplate.from_template("You are an assistant chatbot")
 
     prompt_template = ChatPromptTemplate.from_messages([
-        # system_prompt,
+        system_prompt,
         MessagesPlaceholder(variable_name="chat_history_normal"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
