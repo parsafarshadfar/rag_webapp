@@ -131,7 +131,7 @@ try:
             "top_p": 0.9,  # Nucleus sampling
         }
     )
-except Exception as e: # too avoid huggingface 429 error when it sees to many requests from same IP.
+except Exception as e: # to avoid huggingface 429 error when it sees too many requests from the same IP.
     if "429" in str(e):
         handle_429_error()
     else:
