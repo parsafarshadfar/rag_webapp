@@ -118,7 +118,7 @@ persona_templates = {
 
 # Model Configration
 llm = HuggingFaceHub(
-    repo_id="huggingfaceh4/zephyr-7b-alpha",
+    repo_id="huggingfaceh4/zephyr-7b-beta",
     model_kwargs={
         "max_new_tokens":128, #max response length
         "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
