@@ -135,7 +135,7 @@ except Exception as e: # too avoid huggingface 429 error when it sees to many re
     if "429" in str(e):
         handle_429_error()
     else:
-        st.error(f"⚠️ Too many requests have been made using this free API today. Please try again later.")
+        st.write(f"⚠️ Too many requests have been made using this free API today. Please try again later. An error occurred: {e}")
         st.stop()
         
 # # Model Configration
