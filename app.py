@@ -114,19 +114,24 @@ persona_templates = {
     Keep responses short and straightforward. Only answer based on the context provided.
     """
 }
-
-
 # Function to fetch free proxies from an online source
 def fetch_free_proxies():
-    url = "https://www.proxy-list.download/api/v1/get?type=https"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            proxy_list = response.text.strip().split("\r\n")
-            return [{"http": f"http://{proxy}", "https": f"http://{proxy}"} for proxy in proxy_list]
-    except Exception as e:
-        st.error(f"Error fetching proxies: {e}")
-    return []
+    proxy_sources = [
+        "https://www.proxyscan.io/api/proxy?type=https",
+        "https://www.proxy-list.download/api/v1/get?type=https",
+        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
+    ]
+    proxies = []
+    for url in proxy_sources:
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                proxy_list = response.text.strip().split('\n')
+                for proxy in proxy_list:
+                    proxies.append({"http": f"http://{proxy}", "https": f"http://{proxy}"})
+        except Exception as e:
+            st.error(f"Error fetching proxies from {url}: {e}")
+    return proxies
 
 # Function to test a proxy
 def test_proxy(proxy):
