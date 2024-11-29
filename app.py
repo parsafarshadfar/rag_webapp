@@ -14,6 +14,7 @@ import hashlib
 import uuid
 import json
 from datetime import datetime
+import requests  
 
 from langchain_community.llms import Cohere
 from langchain_community.llms import HuggingFaceHub
