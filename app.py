@@ -268,7 +268,7 @@ st.sidebar.divider() # add a divider in the sidebar panel
 # Set up a temperature slider for the LLM model
 st.session_state['temperature_value'] = st.sidebar.slider(
     "LLM Model Temperature:",
-    min_value=0.5,
+    min_value=0.05,
     max_value=1.0,
     value=0.5,  # Default value
     step=0.05
