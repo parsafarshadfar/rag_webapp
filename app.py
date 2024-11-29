@@ -120,7 +120,7 @@ persona_templates = {
 llm = HuggingFaceHub(
     repo_id="huggingfaceh4/zephyr-7b-alpha",
     model_kwargs={
-        "max_new_tokens":256, #max response length
+        "max_new_tokens":128, #max response length
         "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
         "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature
         "top_p": 0.9, #  letting the model consider a wider range of words (top_p : 0 to 1)
