@@ -121,6 +121,7 @@ def fetch_free_proxies():
         "https://www.proxyscan.io/api/proxy?type=https",
         "https://www.proxy-list.download/api/v1/get?type=https",
         "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt"
     ]
     proxies = []
     for url in proxy_sources:
@@ -131,7 +132,7 @@ def fetch_free_proxies():
                 for proxy in proxy_list:
                     proxies.append({"http": f"http://{proxy}", "https": f"http://{proxy}"})
         except Exception as e:
-            st.error(f"Error in fetching some free proxies. They were supposed to be used for ditching the 'exceeding limit error' on huggingface 'free API' requests : {e}")
+            st.error(f"Error in fetching some free proxies. They were supposed to be used for ditching the 'exceeding limit error' on huggingface 'free API' requests. {e}")
     return proxies
 
 # Function to test the free proxy
