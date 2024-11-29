@@ -117,7 +117,7 @@ persona_templates = {
 
 # Function to handle API rate limiting
 def handle_429_error():
-    st.error("⚠️ Too many requests have been made using this free API today. Please try again later.")
+    st.write("⚠️ Too many requests have been made using this free API today. Please try again later.")
     st.stop()  # Stop execution to prevent further calls
 
 # Model Configuration with exception handling
@@ -135,7 +135,7 @@ except Exception as e: # too avoid huggingface 429 error when it sees to many re
     if "429" in str(e):
         handle_429_error()
     else:
-        st.error(f"An error occurred: {e}")
+        st.error(f"⚠️ Too many requests have been made using this free API today. Please try again later.")
         st.stop()
         
 # # Model Configration
