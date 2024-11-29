@@ -115,29 +115,63 @@ persona_templates = {
 }
 
 
-# Function to handle API rate limiting
-def handle_429_error():
-    st.write("⚠️ Too many requests have been made using this free API today. Please try again later.")
-    st.stop()  # Stop execution to prevent further calls
+# Function to fetch free proxies from an online source
+def fetch_free_proxies():
+    url = "https://www.proxy-list.download/api/v1/get?type=https"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            proxy_list = response.text.strip().split("\r\n")
+            return [{"http": f"http://{proxy}", "https": f"http://{proxy}"} for proxy in proxy_list]
+    except Exception as e:
+        st.error(f"Error fetching proxies: {e}")
+    return []
+
+# Function to test a proxy
+def test_proxy(proxy):
+    try:
+        response = requests.get("https://api-inference.huggingface.co/models", proxies=proxy, timeout=5)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+# Function to handle API requests with retries using proxies
+def retry_with_proxies(repo_id, model_kwargs, prompt):
+    proxies = fetch_free_proxies()
+    for proxy in proxies:
+        if test_proxy(proxy):
+            try:
+                llm = HuggingFaceHub(
+                    repo_id=repo_id,
+                    model_kwargs=model_kwargs,
+                    proxies=proxy
+                )
+                return llm(prompt)  # Return the response if successful
+            except Exception as e:
+                if "429" in str(e):
+                    continue  # Try the next proxy
+    st.error("⚠️ Too many requests have been made using this API today. Proxies failed to resolve the issue.")
+    st.stop()
 
 # Model Configuration with exception handling
+repo_id = "huggingfaceh4/zephyr-7b-alpha"
+model_kwargs = {
+    "max_new_tokens": 128,  # Max response length
+    "repetition_penalty": 1.1,  # Discourage repetition
+    "temperature": st.session_state.get('temperature_value', 0.5),  # Reduce for focused responses
+    "top_p": 0.9,  # Nucleus sampling
+}
+
 try:
     llm = HuggingFaceHub(
-        repo_id="huggingfaceh4/zephyr-7b-alpha",
-        model_kwargs={
-            "max_new_tokens": 128,  # Max response length
-            "repetition_penalty": 1.1,  # Discourage repetition
-            "temperature": st.session_state.get('temperature_value', 0.5),  # Reduce for focused responses
-            "top_p": 0.9,  # Nucleus sampling
-        }
+        repo_id=repo_id,
+        model_kwargs=model_kwargs
     )
-except Exception as e: # to avoid huggingface 429 error when it sees too many requests from the same IP.
+except Exception as e:
     if "429" in str(e):
-        handle_429_error()
-    else:
-        st.write(f"⚠️ Too many requests have been made using this free API today. Please try again later. An error occurred: {e}")
-        st.stop()
-        
+        st.write("⚠️ Too many requests from this IP. Trying proxies...")
+        llm = retry_with_proxies(repo_id, model_kwargs, None)
+
 # # Model Configration
 # llm = HuggingFaceHub(
 #     repo_id="huggingfaceh4/zephyr-7b-alpha",
