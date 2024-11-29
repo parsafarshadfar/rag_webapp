@@ -162,10 +162,11 @@ def retry_with_proxies(repo_id, model_kwargs, prompt):
 # Model Configuration with exception handling
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
-    "max_new_tokens": 128,  # Max response length
+    "max_new_tokens": 512,  # Max response length
     "repetition_penalty": 1.1,  # Discourage repetition
     "temperature": st.session_state.get('temperature_value', 0.5),  # Reduce for focused responses
     "top_p": 0.9,  # Nucleus sampling
+    "return_full_text":False
 }
 
 try:
