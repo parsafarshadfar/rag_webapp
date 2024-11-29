@@ -5,7 +5,7 @@ This project is a conversational chatbot application built with **Streamlit** an
 
 Try my app: https://whisperingpdf.streamlit.app/ 
 
-Please note that this application utilizes Hugging Face's **free API**, which has daily request limits. During high-traffic periods, if these limits are exceeded, the application attempts to route requests through free proxies to maintain functionality. However, the availability and reliability of these proxies are not guaranteed, so this solution may not always be effective.
+Please note that this application utilizes Hugging Face's **free API**, which has daily request limits. During high-traffic periods, if these limits are exceeded, this app employs a tricky workaround by routing huggingface API requests through free proxies to maintain functionality. However, the availability and reliability of these proxies are not guaranteed, so this solution may not always be effective.
 
 ![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png)
 
