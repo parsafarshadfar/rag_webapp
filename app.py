@@ -47,7 +47,7 @@ st.set_page_config(
 ############################ LLM Model ###########################
 
 # hugging face model configration info:
-HF_TOKEN = st.secrets['API_TOKEN'] # add you hugging face token here
+HF_TOKEN = st.secrets['API_TOKEN2'] # add you hugging face token here
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
 embeddings = HuggingFaceInferenceAPIEmbeddings(
@@ -118,7 +118,7 @@ persona_templates = {
 
 # Model Configration
 llm = HuggingFaceHub(
-    repo_id="huggingfaceh4/zephyr-7b-alpha",
+    repo_id="mistralai/Mistral-Small-Instruct-2409",
     model_kwargs={
         "max_new_tokens":512, #max response length
         "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
