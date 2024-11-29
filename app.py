@@ -114,7 +114,8 @@ persona_templates = {
     Keep responses short and straightforward. Only answer based on the context provided.
     """
 }
-# Function to fetch free proxies from an online source
+
+# Function to fetch free proxies from an online source ## to be used on huggingface 'free API requests' if huggingface is giving "too many requests" 429 error
 def fetch_free_proxies():
     proxy_sources = [
         "https://www.proxyscan.io/api/proxy?type=https",
@@ -130,10 +131,10 @@ def fetch_free_proxies():
                 for proxy in proxy_list:
                     proxies.append({"http": f"http://{proxy}", "https": f"http://{proxy}"})
         except Exception as e:
-            st.error(f"Error fetching proxies from {url}: {e}")
+            st.error(f"Error in fetching some free proxies. They were supposed to be used for ditching the 'exceeding limit error' on huggingface 'free API' requests : {e}")
     return proxies
 
-# Function to test a proxy
+# Function to test the free proxy
 def test_proxy(proxy):
     try:
         response = requests.get("https://api-inference.huggingface.co/models", proxies=proxy, timeout=5)
@@ -156,13 +157,13 @@ def retry_with_proxies(repo_id, model_kwargs, prompt):
             except Exception as e:
                 if "429" in str(e):
                     continue  # Try the next proxy
-    st.error("⚠️ Too many requests have been made using this API today. Proxies failed to resolve the issue.")
+    st.error("⚠️ Too many requests have been made by this streamlit server to huggingface 'free API' today. I also tried to use some free proxies to ditch huggingface, but the free proxies didn't work. Please try the app later.")
     st.stop()
 
 # Model Configuration with exception handling
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
-    "max_new_tokens": 512,  # Max response length
+    "max_new_tokens": 256,  # Max response length
     "repetition_penalty": 1.1,  # Discourage repetition
     "temperature": st.session_state.get('temperature_value', 0.5),  # Reduce for focused responses
     "top_p": 0.9,  # Nucleus sampling
@@ -176,7 +177,7 @@ try:
     )
 except Exception as e:
     if "429" in str(e):
-        st.write("⚠️ Too many requests from this IP. Trying proxies...")
+        st.write("⚠️ Too many requests have been made by this streamlit server to huggingface free API today. Let me try some find some free proxies and try on huggingface requests to ditch them :)")
         llm = retry_with_proxies(repo_id, model_kwargs, None)
 
 # # Model Configration
