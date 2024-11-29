@@ -115,17 +115,39 @@ persona_templates = {
 }
 
 
+# Function to handle API rate limiting
+def handle_429_error():
+    st.error("⚠️ Too many requests have been made using this free API today. Please try again later.")
+    st.stop()  # Stop execution to prevent further calls
 
-# Model Configration
-llm = HuggingFaceHub(
-    repo_id="huggingfaceh4/zephyr-7b-beta",
-    model_kwargs={
-        "max_new_tokens":128, #max response length
-        "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
-        "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature
-        "top_p": 0.9, #  letting the model consider a wider range of words (top_p : 0 to 1)
-        "return_full_text":False}
-)
+# Model Configuration with exception handling
+try:
+    llm = HuggingFaceHub(
+        repo_id="huggingfaceh4/zephyr-7b-alpha",
+        model_kwargs={
+            "max_new_tokens": 128,  # Max response length
+            "repetition_penalty": 1.1,  # Discourage repetition
+            "temperature": st.session_state.get('temperature_value', 0.5),  # Reduce for focused responses
+            "top_p": 0.9,  # Nucleus sampling
+        }
+    )
+except Exception as e: # too avoid huggingface 429 error when it sees to many requests from same IP.
+    if "429" in str(e):
+        handle_429_error()
+    else:
+        st.error(f"An error occurred: {e}")
+        st.stop()
+        
+# # Model Configration
+# llm = HuggingFaceHub(
+#     repo_id="huggingfaceh4/zephyr-7b-alpha",
+#     model_kwargs={
+#         "max_new_tokens":128, #max response length
+#         "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
+#         "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature
+#         "top_p": 0.9, #  letting the model consider a wider range of words (top_p : 0 to 1)
+#         "return_full_text":False}
+# )
 
 # prompt = ChatPromptTemplate.from_template(template) # make the prompt template based on 'context' and 'question'
 prompt = ChatPromptTemplate.from_template(persona_templates[st.session_state.get('persona','Technical')])  # make the persona specific prompt template based on 'context' and 'question'
