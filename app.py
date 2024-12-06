@@ -118,10 +118,9 @@ persona_templates = {
 # Function to fetch free proxies from an online source ## to be used on huggingface 'free API requests' if huggingface is giving "too many requests" 429 error
 def fetch_free_proxies():
     proxy_sources = [
-        "https://www.proxyscan.io/api/proxy?type=https",
         "https://www.proxy-list.download/api/v1/get?type=https",
-        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt",
-        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt"
+        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
     ]
     proxies = []
     for url in proxy_sources:
