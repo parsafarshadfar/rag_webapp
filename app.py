@@ -174,7 +174,7 @@ def retry_with_proxies(repo_id, model_kwargs, prompt):
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
     "max_new_tokens": 256,  # Max response length
-    "repetition_penalty": 1.1,   #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
+    "repetition_penalty": 1.1,   #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses.
     "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature (global randomness)
     "top_p": 0.9,  # Nucleus sampling  #  letting the model consider a wider range of word randomness within local context (top_p : 0 to 1)
     "return_full_text":False
