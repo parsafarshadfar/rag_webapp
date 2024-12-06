@@ -119,8 +119,8 @@ persona_templates = {
 def fetch_free_proxies():
     proxy_sources = [
         "https://www.proxy-list.download/api/v1/get?type=https",
-        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
     ]
     proxies = []
     for url in proxy_sources:
