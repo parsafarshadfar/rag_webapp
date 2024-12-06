@@ -135,11 +135,20 @@ def fetch_free_proxies():
             st.error(f"Error in fetching some free proxies. They were supposed to be used for ditching the 'exceeding limit error' on huggingface 'free API' requests. {e}")
     return proxies
 
-# Function to test the free proxy
+# Function to test the free proxy for reliability and speed
 def test_proxy(proxy):
+    test_url = "https://api-inference.huggingface.co/models"
+    # Using HEAD request to quickly check responsiveness without transferring full data
     try:
-        response = requests.get("https://api-inference.huggingface.co/models", proxies=proxy, timeout=5)
-        return response.status_code == 200
+        start_time = time.time()
+        response = requests.head(test_url, proxies=proxy, timeout=3)  # shorter timeout
+        latency = time.time() - start_time
+
+        # Check if status_code indicates success and latency is acceptable
+        if response.status_code == 200 and latency < 3:
+            return True
+        else:
+            return False
     except Exception:
         return False
 
