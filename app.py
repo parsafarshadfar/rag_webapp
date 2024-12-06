@@ -126,7 +126,7 @@ def fetch_free_proxies():
     proxies = []
     for url in proxy_sources:
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=5)
             if response.status_code == 200:
                 proxy_list = response.text.strip().split('\n')
                 for proxy in proxy_list:
@@ -141,11 +141,11 @@ def test_proxy(proxy):
     # Using HEAD request to quickly check responsiveness without transferring full data
     try:
         start_time = time.time()
-        response = requests.head(test_url, proxies=proxy, timeout=3)  # shorter timeout
+        response = requests.head(test_url, proxies=proxy, timeout=2)  # shorter timeout
         latency = time.time() - start_time
 
         # Check if status_code indicates success and latency is acceptable
-        if response.status_code == 200 and latency < 3:
+        if response.status_code == 200 and latency < 2:
             return True
         else:
             return False
