@@ -11,7 +11,7 @@ Please note that this application utilizes Hugging Face's **free API**, which ha
 
 ### Overview
 
-This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser.
+This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser. 
 
 ---
 
