@@ -34,7 +34,7 @@ The core of this chatbot application is **Zephyr-7B-α**, a language model in th
 To set up and run this application, follow these steps: 
 
 1. **Clone the Repository**
-   ```bash
+   ```bash 
    git clone https://github.com/parsafarshadfar/rag_webapp.git
    ```
 
