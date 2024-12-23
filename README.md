@@ -52,7 +52,7 @@ To set up and run this application, follow these steps:
    
    step 1, Comment the first three lines if you are using tha app locally.
   
-   step 2, Start the Streamlit app using the following command in terminal:
+   step 2, Start the Streamlit app using the following command in terminal: 
    
    ```bash
    streamlit run app.py
