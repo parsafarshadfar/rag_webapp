@@ -48,7 +48,7 @@ To set up and run this application, follow these steps:
 
    Replace HF_TOKEN value in the code with your Hugging Face API token. 
    
-4. **Local Usage Note** 
+4. **Local Usage Note**  
    
    step 1, Comment the first three lines if you are using tha app locally.
   
