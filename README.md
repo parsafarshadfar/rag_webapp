@@ -64,4 +64,4 @@ To set up and run this application, follow these steps:
 
 This will launch the application on `http://localhost:8501`, where you can upload PDF files and query content. The app can also be deployed on [Streamlit Cloud](https://share.streamlit.io/) or other cloud platforms like Azure, AWS, and more.
 
----
+--- 
