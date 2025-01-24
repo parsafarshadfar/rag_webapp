@@ -8,7 +8,7 @@ Try my app: https://whisperingpdf.streamlit.app/
 Please note that this application utilizes Hugging Face's **free API**, which has daily request limits. During high-traffic periods, if these limits are exceeded, this app employs a tricky workaround by routing huggingface API requests through free proxies to maintain functionality. However, the availability and reliability of these proxies are not guaranteed, so this solution may not always be effective.
 
 ![An overview of the the RAG Webapp: upload PDF, Ask questions.](./Screenshot.png) 
-
+ 
 ### Overview
 
 This application enables users to chat with a PDF-based assistant that leverages the Zephyr-7B-α model. Whether you’re looking for precise answers based on document contents or casual conversation, this application offers an interactive, user-friendly experience directly in the browser. 
