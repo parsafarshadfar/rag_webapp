@@ -42,7 +42,7 @@ To set up and run this application, follow these steps:
    Ensure you have Python 3.8+ installed. Install the required packages:
    ```bash
    pip install -r requirements.txt
-   ```
+   ``` 
 
 3. **Set up Hugging Face API Token**
 
