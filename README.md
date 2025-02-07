@@ -20,7 +20,7 @@ This application enables users to chat with a PDF-based assistant that leverages
 - **Role-Specific Tones**: Adjust the assistant’s tone with options like Friendly, Formal, Technical, and Concise for tailored responses.
 - **Customizable Temperature**: Modify the response creativity through temperature control, offering focused responses based on your PDF content. Note: lower the temperature for responses that adhere strictly to your PDF content.
 - **Session History Download**: Download your chat history in OpenAI’s JSON format, making it easy to keep records or analyze conversations.  
-
+ 
 --- 
 
 ### Model Information
