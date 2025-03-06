@@ -24,7 +24,7 @@ This application enables users to chat with a PDF-based assistant that leverages
 --- 
 
 ### Model Information
-
+ 
 The core of this chatbot application is **Zephyr-7B-α**, a language model in the Zephyr series, specifically trained to serve as a helpful, conversational assistant. [**Zephyr-7B-α**](https://huggingface.co/HuggingFaceH4/zephyr-7b-alpha) is based on [**mistralai/Mistral-7B-v0.1**](https://huggingface.co/mistralai/Mistral-7B-v0.1) and fine-tuned on a combination of publicly available and synthetic datasets. 
 
 ---
