@@ -1,14 +1,24 @@
-# ─── Cloud‑only SQLite shim ────────────────────────────────────────────────────
+import streamlit as st
+
+# ─── MUST be the first Streamlit command ──────────────────────────────────────
+st.set_page_config(
+    page_title="RAG Webapp",
+    layout="wide",
+    page_icon="🤖",
+    initial_sidebar_state="expanded",
+)
+# ───────────────────────────────────────────────────────────────────────────────
+
+# Standard‑library imports -----------------------------------------------------
 __import__("pysqlite3")          # ⚠️ Comment these three lines if running locally
 import sys                       # ⚠️ Comment these three lines if running locally
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")  # ⚠️ Comment these if local
 
-# ─── Standard libs ─────────────────────────────────────────────────────────────
 import os, uuid, json, tempfile, shutil, warnings
 from datetime import datetime
+from typing import Union  # needed for pydantic forward refs
 
-# ─── Third‑party libs ──────────────────────────────────────────────────────────
-import streamlit as st
+# Third‑party imports ----------------------------------------------------------
 import chromadb
 from langchain_community.llms import HuggingFaceHub
 from langchain_core.prompts import ChatPromptTemplate
@@ -22,28 +32,18 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 chromadb.api.client.SharedSystemClient.clear_system_cache()
 
-# ────────────────────── PATCH for pydantic “class‑not‑fully‑defined” ──────────
-"""
-Some Streamlit‑Cloud containers load Pydantic‑v2 and LangChain in an order that
-makes forward‑references inside `HuggingFaceHub` unavailable at import time.
-We provide any missing symbols *then* call `model_rebuild(force=True)` so
-Pydantic re‑parses the model with everything present.
-"""
-from typing import Union  # noqa: F401
-
-# Provide / stub‑out BaseCache if LangChain didn't export it yet
+# ── Patch for pydantic “class‑not‑fully‑defined” in HuggingFaceHub ────────────
 try:
-    from langchain_core.cache import BaseCache  # LangChain ≥ 0.2
+    from langchain_core.cache import BaseCache
 except ImportError:
     try:
-        from langchain.cache import BaseCache   # Older LangChain
+        from langchain.cache import BaseCache
     except ImportError:
         class BaseCache:  # type: ignore
-            """Minimal stand‑in to satisfy forward refs."""
+            """Minimal stub for missing BaseCache forward ref."""
             pass
 
-import sys as _sys
-_hf_mod = _sys.modules[HuggingFaceHub.__module__]
+_hf_mod = sys.modules[HuggingFaceHub.__module__]
 if not hasattr(_hf_mod, "BaseCache"):
     setattr(_hf_mod, "BaseCache", BaseCache)
 
@@ -53,23 +53,15 @@ except Exception:
     pass
 # ───────────────────────────────────────────────────────────────────────────────
 
-# ─── Streamlit page config ─────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="RAG Webapp",
-    layout="wide",
-    page_icon="🤖",
-    initial_sidebar_state="expanded",
-)
-
-# ─── Hugging Face embedding model (BAAI/bge‑base) ─────────────────────────────
-HF_TOKEN = st.secrets["API_TOKEN"]          # put your token in `.streamlit/secrets.toml`
+# Hugging Face token & embeddings ---------------------------------------------
+HF_TOKEN = st.secrets["API_TOKEN"]           # define in .streamlit/secrets.toml
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
 embeddings = HuggingFaceInferenceAPIEmbeddings(
     api_key=HF_TOKEN, model_name="BAAI/bge-base-en-v1.5"
 )
 
-# ─── Persona‑specific prompt templates ─────────────────────────────────────────
+# Prompt templates -------------------------------------------------------------
 PERSONA_TEMPLATES = {
     "Friendly": '''Answer the question in a warm, conversational tone based ONLY on the following context:
     {context}
@@ -101,32 +93,28 @@ PERSONA_TEMPLATES = {
     ''',
 }
 
-# ─── Session‑level objects ─────────────────────────────────────────────────────
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Session state defaults -------------------------------------------------------
+st.session_state.setdefault("chat_history", [])
+st.session_state.setdefault("temperature_value", 0.5)
+st.session_state.setdefault("persona", "Technical")
+session_id = st.session_state.setdefault("session_id", str(uuid.uuid4()))
 
-if "temperature_value" not in st.session_state:
-    st.session_state.temperature_value = 0.5
-
-if "persona" not in st.session_state:
-    st.session_state.persona = "Technical"
-
-# ─── Sidebar controls ──────────────────────────────────────────────────────────
+# Sidebar UI -------------------------------------------------------------------
 file_upload = st.sidebar.file_uploader("Upload your PDF", type="pdf")
 
-st.session_state.temperature_value = st.sidebar.slider(
+st.session_state["temperature_value"] = st.sidebar.slider(
     "LLM Model Temperature",
-    min_value=0.05,
-    max_value=1.0,
-    value=st.session_state.temperature_value,
-    step=0.05,
+    0.05,
+    1.0,
+    st.session_state["temperature_value"],
+    0.05,
 )
 st.sidebar.write("Lower temperature → answers stick more closely to your PDF content.")
 
-st.session_state.persona = st.sidebar.selectbox(
+st.session_state["persona"] = st.sidebar.selectbox(
     "Assistant tone",
     ("Friendly", "Formal", "Technical", "Concise"),
-    index=("Friendly", "Formal", "Technical", "Concise").index(st.session_state.persona),
+    index=("Friendly", "Formal", "Technical", "Concise").index(st.session_state["persona"]),
 )
 
 st.sidebar.divider()
@@ -138,32 +126,29 @@ if st.sidebar.button("Delete PDF contents from vector DB"):
     else:
         st.sidebar.error("No collection to delete.")
 
-if st.session_state.chat_history:
-    history_json = json.dumps(st.session_state.chat_history, indent=2)
+if st.session_state["chat_history"]:
+    history_json = json.dumps(st.session_state["chat_history"], indent=2)
     st.sidebar.download_button(
-        label="Download Chat History",
-        data=history_json,
-        file_name=f"History_{datetime.now():%Y%m%d}.json",
-        mime="application/json",
+        "Download Chat History",
+        history_json,
+        f"History_{datetime.now():%Y%m%d}.json",
+        "application/json",
     )
 
-# ─── Unique session ID & Chroma collection ────────────────────────────────────
-session_id = st.session_state.get("session_id") or str(uuid.uuid4())
-st.session_state.session_id = session_id
-
+# Vector DB --------------------------------------------------------------------
 if "vector_db" not in st.session_state:
-    st.session_state.vector_db = Chroma(
+    st.session_state["vector_db"] = Chroma(
         embedding_function=embeddings,
         collection_name=session_id,
     )
-retriever = st.session_state.vector_db.as_retriever()
+retriever = st.session_state["vector_db"].as_retriever()
 
-# ─── Initialise LLM FIRST (with rebuilt model) ────────────────────────────────
+# Initialise HuggingFace LLM ---------------------------------------------------
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
     "max_new_tokens": 256,
     "repetition_penalty": 1.1,
-    "temperature": st.session_state.temperature_value,
+    "temperature": st.session_state["temperature_value"],
     "top_p": 0.9,
     "return_full_text": False,
 }
@@ -171,11 +156,11 @@ model_kwargs = {
 try:
     llm = HuggingFaceHub(repo_id=repo_id, model_kwargs=model_kwargs)
 except Exception as e:
-    st.error(f"🚫 Unable to initialise Hugging Face model: {e}")
+    st.error(f"🚫 Could not initialise Hugging Face model:\n{e}")
     st.stop()
 
-# ─── Build prompt, parser, and chain ──────────────────────────────────────────
-prompt_tpl = ChatPromptTemplate.from_template(PERSONA_TEMPLATES[st.session_state.persona])
+# Build RAG chain --------------------------------------------------------------
+prompt_tpl = ChatPromptTemplate.from_template(PERSONA_TEMPLATES[st.session_state["persona"]])
 output_parser = StrOutputParser()
 
 chain = (
@@ -188,18 +173,20 @@ chain = (
     | output_parser
 )
 
-# ─── Main title ───────────────────────────────────────────────────────────────
+# Main UI ----------------------------------------------------------------------
 st.title("Chat with PDF")
 
-# ─── Handle PDF upload ────────────────────────────────────────────────────────
+# Handle PDF upload ------------------------------------------------------------
 if file_upload:
-    st.session_state.file_name = file_upload.name
+    st.session_state["file_name"] = file_upload.name
 
-    del st.session_state.vector_db
-    st.session_state.vector_db = Chroma(
-        embedding_function=embeddings, collection_name=session_id
+    # Refresh vector store
+    del st.session_state["vector_db"]
+    st.session_state["vector_db"] = Chroma(
+        embedding_function=embeddings,
+        collection_name=session_id,
     )
-    retriever = st.session_state.vector_db.as_retriever()
+    retriever = st.session_state["vector_db"].as_retriever()
 
     tmp_dir = tempfile.mkdtemp()
     pdf_path = os.path.join(tmp_dir, f"{session_id}_{file_upload.name}")
@@ -208,31 +195,28 @@ if file_upload:
 
     docs = PyPDFLoader(pdf_path).load()
     chunks = RecursiveCharacterTextSplitter(chunk_size=2048, chunk_overlap=128).split_documents(docs)
-    st.session_state.vector_db = Chroma.from_documents(chunks, embeddings, collection_name=session_id)
+    st.session_state["vector_db"] = Chroma.from_documents(chunks, embeddings, collection_name=session_id)
     shutil.rmtree(tmp_dir)
 
-# ─── Chat interface ───────────────────────────────────────────────────────────
+# Chat interface ---------------------------------------------------------------
 if file_upload:
     msg_container = st.container(height=600, border=True)
 
-    for m in st.session_state.chat_history:
+    for m in st.session_state["chat_history"]:
         avatar = "🤖" if m["role"] == "assistant" else "🤔"
         with msg_container.chat_message(m["role"], avatar=avatar):
             st.markdown(m["content"])
 
     if user_msg := st.chat_input("Enter a prompt here…"):
-        st.session_state.chat_history.append({"role": "user", "content": user_msg})
+        st.session_state["chat_history"].append({"role": "user", "content": user_msg})
         msg_container.chat_message("user", avatar="🤔").markdown(user_msg)
 
         with msg_container.chat_message("assistant", avatar="🤖"):
             with st.spinner("processing…"):
-                if st.session_state.vector_db:
-                    answer = chain.invoke(user_msg)
-                    st.markdown(answer)
-                else:
-                    st.warning("Please upload a PDF first.")
+                answer = chain.invoke(user_msg) if st.session_state["vector_db"] else "Please upload a PDF first."
+                st.markdown(answer)
 
-        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        st.session_state["chat_history"].append({"role": "assistant", "content": answer})
         st.rerun()
 else:
     st.info("⬅️ Upload a PDF from the sidebar to start chatting.")
