@@ -14,10 +14,13 @@ import os, time, tempfile, shutil, uuid, json, requests, hashlib
 from datetime import datetime
 import streamlit as st
 from requests.exceptions import HTTPError
-from typing import Union                         # 🆕 ensure forward‑ref exists
+from typing import Union                         # ✨ ensure forward‑ref exists
+
+# ✨ ensure Pydantic can resolve 'BaseCache' before model_rebuild
+from langchain_core.caches import BaseCache     # ✨ NEW IMPORT
 
 from langchain_community.llms import Cohere, HuggingFaceHub
-HuggingFaceHub.model_rebuild()                  # 🆕 fix pydantic "not fully defined"
+HuggingFaceHub.model_rebuild()                  # rebuild with all refs resolved
 
 from langchain.prompts import HumanMessagePromptTemplate
 from langchain_core.messages import SystemMessage
@@ -168,7 +171,7 @@ except HTTPError as e:
     else:
         st.error(f"LLM initialisation failed: {e}")
         st.stop()
-except Exception as e:                            # 🆕 catch *any* other pydantic error
+except Exception as e:
     st.error(f"Unexpected error while creating the LLM: {e}")
     st.stop()
 
