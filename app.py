@@ -1,25 +1,7 @@
-"""
-Streamlit RAG chat‑with‑PDF app (rev. 2025‑05‑10)
--------------------------------------------------
-Key fixes
-~~~~~~~~~
-*   Robust handling of HuggingFace rate‑limits – `llm` is *always* defined or
-    the app stops gracefully.
-*   `retry_with_proxies()` now returns **an LLM object** rather than a string
-    response.
-*   Catches concrete `HTTPError` and inspects status codes instead of fragile
-    substring checks.
-*   Tidied duplicates and removed unused imports.
 
-Tested with the pinned versions in *requirements.txt* (Python 3.12).
-"""
-
-# ---------------------------------------------------------------------------
-# Monkey‑patch for pysqlite3 on Streamlit Community Cloud
-# ---------------------------------------------------------------------------
-__import__("pysqlite3")                     # noqa: E402 – must run *very* early
-import sys as _sys                          # (community cloud lacks system SQLite)
-_sys.modules["sqlite3"] = _sys.modules.pop("pysqlite3")
+__import__("pysqlite3")
+import sys
+sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
 # ---------------------------------------------------------------------------
 # Standard library imports
