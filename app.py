@@ -22,6 +22,17 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 chromadb.api.client.SharedSystemClient.clear_system_cache()
 
+# ────────────────────── PATCH for pydantic “class‑not‑fully‑defined” ──────────
+# Some Streamlit Cloud images ship pydantic v2 in a state where the forward
+# reference “Union” isn’t available yet when LangChain’s HuggingFaceHub model
+# is parsed.  Explicitly importing Union and calling model_rebuild() resolves it.
+from typing import Union  # noqa: F401
+try:
+    HuggingFaceHub.model_rebuild(force=True)
+except Exception:
+    pass
+# ───────────────────────────────────────────────────────────────────────────────
+
 # ─── Streamlit page config ─────────────────────────────────────────────────────
 st.set_page_config(
     page_title="RAG Webapp",
@@ -133,7 +144,7 @@ if "vector_db" not in st.session_state:
     )
 retriever = st.session_state.vector_db.as_retriever()
 
-# ─── Initialise LLM FIRST (before building chain) ─────────────────────────────
+# ─── Initialise LLM FIRST (with rebuilt model) ────────────────────────────────
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
     "max_new_tokens": 256,
