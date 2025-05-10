@@ -1,115 +1,151 @@
-
+# ---------------------------------------------------------------
+# RAG Web‑app – Streamlit + LangChain + Hugging Face
+# ---------------------------------------------------------------
+# cloud‑only shim for sqlite3 → pysqlite3 (leave as‑is locally)
 __import__("pysqlite3")
 import sys
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
-# ---------------------------------------------------------------------------
-# Standard library imports
-# ---------------------------------------------------------------------------
-import os
-import uuid
-import shutil
-import json
-import time
-import tempfile
-import warnings
-from datetime import datetime
-
-# Third‑party imports
-import requests
-from requests.exceptions import HTTPError
-import streamlit as st
-
+# -------------- stdlib / third‑party imports -------------------
 import chromadb
-from langchain_community.llms import HuggingFaceHub
-from langchain_community.embeddings import (
-    HuggingFaceInferenceAPIEmbeddings,
-)
+chromadb.api.client.SharedSystemClient.clear_system_cache()
+
+import os, time, tempfile, shutil, uuid, json, requests, hashlib
+from datetime import datetime
+import streamlit as st
+from requests.exceptions import HTTPError
+from typing import Union                         # 🆕 ensure forward‑ref exists
+
+from langchain_community.llms import Cohere, HuggingFaceHub
+HuggingFaceHub.model_rebuild()                  # 🆕 fix pydantic "not fully defined"
+
+from langchain.prompts import HumanMessagePromptTemplate
+from langchain_core.messages import SystemMessage
+from langchain.memory import ConversationBufferMemory
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.schema import StrOutputParser
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain.schema import StrOutputParser
 
-# ----------------------------------------------------------------------------
-# Streamlit & global config
-# ----------------------------------------------------------------------------
+import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+# ---------------- Streamlit page settings ----------------------
 st.set_page_config(
     page_title="RAG Webapp",
-    page_icon="🤖",
     layout="wide",
+    page_icon="🤖",
     initial_sidebar_state="expanded",
 )
-print("Retrieving…")
 
-# Clear any leftover Chroma cache in the shared Community Cloud runtime
-chromadb.api.client.SharedSystemClient.clear_system_cache()
-
-# ----------------------------------------------------------------------------
-# Hugging Face & embeddings
-# ----------------------------------------------------------------------------
+# -------------------------- API keys ---------------------------
 HF_TOKEN = st.secrets["API_TOKEN"]
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
+# -------------------- Embeddings & Vector DB -------------------
 embeddings = HuggingFaceInferenceAPIEmbeddings(
-    api_key=HF_TOKEN,
-    model_name="BAAI/bge-base-en-v1.5",
+    api_key=HF_TOKEN, model_name="BAAI/bge-base-en-v1.5"
 )
 
-# ----------------------------------------------------------------------------
-# Helper functions – proxy handling
-# ----------------------------------------------------------------------------
+session_id = str(uuid.uuid4())
+st.session_state["vector_db"] = Chroma(
+    embedding_function=embeddings, collection_name=session_id
+)
+retriever = st.session_state["vector_db"].as_retriever()
 
-def fetch_free_proxies() -> list[dict]:
-    """Fetch a bunch of free HTTPS proxies from public lists."""
+# ------------------- Persona prompt templates ------------------
+persona_templates = {
+    "Friendly": """Answer the question in a warm, conversational tone based ONLY on the following context:
+    {context}
+
+    Question: {question}
+
+    If you don't know the answer, just say that you don't know. Keep it friendly and approachable!
+    """,
+    "Formal": """Answer the question in a professional and respectful tone based ONLY on the following context:
+    {context}
+
+    Question: {question}
+
+    If you don't know the answer, state it politely without making up any information.
+    """,
+    "Technical": """Answer the question in a technical and detailed tone based ONLY on the following context:
+    {context}
+
+    Question: {question}
+
+    Provide accurate, in‑depth answers as applicable. Do not guess if the answer is not in the context.
+    """,
+    "Concise": """Answer the question briefly and to the point based ONLY on the following context:
+    {context}
+
+    Question: {question}
+
+    Keep responses short and straightforward. Only answer based on the context provided.
+    """,
+}
+
+# ---------------- Proxy helper utilities ----------------------
+
+def fetch_free_proxies():
     proxy_sources = [
         "https://www.proxy-list.download/api/v1/get?type=https",
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
         "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt",
     ]
-    proxies: list[dict] = []
+    proxies = []
     for url in proxy_sources:
         try:
-            r = requests.get(url, timeout=5)
-            if r.status_code == 200:
-                for p in r.text.strip().split("\n"):
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                for p in resp.text.strip().split("\n"):
                     proxies.append({"http": f"http://{p}", "https": f"http://{p}"})
-        except Exception as e:  # pragma: no cover – best‑effort only
-            st.warning(f"Proxy‑list fetch failed: {e}")
+        except Exception as e:
+            st.error(
+                f"Error grabbing proxy list (used for HF rate‑limit fallback): {e}"
+            )
     return proxies
 
 
-def test_proxy(proxy: dict) -> bool:
-    """Return *True* if the proxy can reach HuggingFace quickly enough."""
-    TEST_URL = "https://api-inference.huggingface.co/models"
+def test_proxy(proxy):
+    """Lightweight HEAD request to check if a proxy works and is fast."""
+    test_url = "https://api-inference.huggingface.co/models"
     try:
-        t0 = time.time()
-        resp = requests.head(TEST_URL, proxies=proxy, timeout=2)
-        return resp.status_code == 200 and (time.time() - t0) < 2
+        start = time.time()
+        r = requests.head(test_url, proxies=proxy, timeout=2)
+        return r.status_code == 200 and (time.time() - start) < 2
     except Exception:
         return False
 
 
-def retry_with_proxies(repo_id: str, model_kwargs: dict):
-    """Try each free proxy until we get a working LLM object or exhaust the list."""
+def retry_with_proxies(repo_id, model_kwargs):
+    """Return a HuggingFaceHub() instance that works through a free proxy."""
     for proxy in fetch_free_proxies():
         if not test_proxy(proxy):
             continue
         try:
-            return HuggingFaceHub(repo_id=repo_id, model_kwargs=model_kwargs, proxies=proxy)
+            return HuggingFaceHub(
+                repo_id=repo_id, model_kwargs=model_kwargs, proxies=proxy
+            )
         except HTTPError as e:
-            if e.response is None or e.response.status_code != 429:
-                # Different error – don’t silently swallow it
-                raise
-            # else: rate‑limit again → try next proxy
-    return None
+            if (
+                e.response is not None
+                and e.response.status_code == 429
+            ):
+                # keep trying other proxies
+                continue
+            raise
+    st.error(
+        "⚠️ Hugging Face free API rate‑limit hit and no usable proxy found. "
+        "Please try again later."
+    )
+    st.stop()
 
-# ----------------------------------------------------------------------------
-# LLM initialisation – *always* end up with a usable object or stop the app
-# ----------------------------------------------------------------------------
+# ----------------------- LLM initialisation --------------------
+
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
     "max_new_tokens": 256,
@@ -120,145 +156,132 @@ model_kwargs = {
 }
 
 llm = None
+
 try:
     llm = HuggingFaceHub(repo_id=repo_id, model_kwargs=model_kwargs)
 except HTTPError as e:
     if e.response is not None and e.response.status_code == 429:
-        st.info("HF rate‑limit hit – retrying with free proxies …")
+        st.warning(
+            "HF rate‑limit hit – trying to route through free proxies …"
+        )
         llm = retry_with_proxies(repo_id, model_kwargs)
     else:
         st.error(f"LLM initialisation failed: {e}")
         st.stop()
-except Exception as e:
+except Exception as e:                            # 🆕 catch *any* other pydantic error
     st.error(f"Unexpected error while creating the LLM: {e}")
     st.stop()
 
 if llm is None:
-    st.error("Could not create a HuggingFaceHub LLM (all proxies exhausted).")
+    st.error("Could not create the LLM. Check your HF token or internet access.")
     st.stop()
 
-# ----------------------------------------------------------------------------
-# Vector‑store & retriever (one collection per browser session)
-# ----------------------------------------------------------------------------
-SESSION_ID = str(uuid.uuid4())
-st.session_state["vector_db"] = Chroma(
-    embedding_function=embeddings,
-    collection_name=SESSION_ID,
+# ---------------------- Prompt & pipeline ----------------------
+
+prompt = ChatPromptTemplate.from_template(
+    persona_templates[st.session_state.get("persona", "Technical")]
 )
-retriever = st.session_state["vector_db"].as_retriever()
+output_parser = StrOutputParser()
 
-# ----------------------------------------------------------------------------
-# Prompt personas
-# ----------------------------------------------------------------------------
-PERSONA_TEMPLATES = {
-    "Friendly": """Answer the question in a warm, conversational tone based **only** on the following context:\n{context}\n\nQuestion: {question}\n\nIf you don't know the answer, just say that you don't know. Keep it friendly and approachable!""",
-    "Formal": """Answer the question in a professional and respectful tone based **only** on the following context:\n{context}\n\nQuestion: {question}\n\nIf you don't know the answer, state it politely without making up any information.""",
-    "Technical": """Answer the question in a technical and detailed manner based **only** on the following context:\n{context}\n\nQuestion: {question}\n\nProvide accurate, in‑depth answers. Do **not** guess if the answer is not in the context.""",
-    "Concise": """Answer the question briefly and to the point based **only** on the following context:\n{context}\n\nQuestion: {question}\n\nKeep responses short and straightforward.""",
-}
-
-# ----------------------------------------------------------------------------
-# Chain (RAG pipeline) – built dynamically based on the selected persona
-# ----------------------------------------------------------------------------
-
-def build_chain(persona: str):
-    prompt = ChatPromptTemplate.from_template(PERSONA_TEMPLATES[persona])
-    return (
-        {
-            "context": retriever.with_config(run_name="Docs"),
-            "question": RunnablePassthrough(),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
-# ----------------------------------------------------------------------------
-# Sidebar – file upload, temperature, persona, housekeeping
-# ----------------------------------------------------------------------------
-file_upload = st.sidebar.file_uploader("Upload a PDF", type="pdf")
-
-st.session_state["temperature_value"] = st.sidebar.slider(
-    "LLM temperature", 0.05, 1.0, 0.5, step=0.05
-)
-st.sidebar.write("Lower values → answers stick closer to the document text.")
-
-st.session_state["persona"] = st.sidebar.selectbox(
-    "Assistant tone", list(PERSONA_TEMPLATES.keys()), index=2
+chain = (
+    {
+        "context": retriever.with_config(run_name="Docs"),
+        "question": RunnablePassthrough(),
+    }
+    | prompt
+    | llm
+    | output_parser
 )
 
-if st.sidebar.button("Delete vector store"):
-    st.session_state.pop("vector_db", None)
-    st.success("Vector DB cleared.")
+# -------------------------- UI layout --------------------------
+st.title("Chat with PDF")
 
-# ----------------------------------------------------------------------------
-# Main app title & chat history initialisation
-# ----------------------------------------------------------------------------
-st.title("📄🤖 Chat with your PDF")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# ----------------------------------------------------------------------------
-# Handle PDF upload – build / refresh vector DB
-# ----------------------------------------------------------------------------
+# ---- Sidebar: upload PDF --------------------------------------
+file_upload = st.sidebar.file_uploader("Upload your PDF", type="pdf")
 if file_upload:
     st.session_state["file_name"] = file_upload.name
+    if "vector_db" in st.session_state:
+        del st.session_state["vector_db"]
 
-    # Refresh vector store for the new document
-    st.session_state["vector_db"].delete_collection()
-
-    tmp_dir = tempfile.mkdtemp()
-    tmp_path = os.path.join(tmp_dir, f"{SESSION_ID}_{file_upload.name}")
-    with open(tmp_path, "wb") as fh:
-        fh.write(file_upload.getbuffer())
-
-    docs = PyPDFLoader(tmp_path).load()
-    chunks = RecursiveCharacterTextSplitter(chunk_size=2048, chunk_overlap=128).split_documents(docs)
-
-    st.session_state["vector_db"] = Chroma.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        collection_name=SESSION_ID,
+    st.session_state["vector_db"] = Chroma(
+        embedding_function=embeddings, collection_name=session_id
     )
     retriever = st.session_state["vector_db"].as_retriever()
-    shutil.rmtree(tmp_dir)
-    st.success("PDF indexed – ask away!")
 
-# ----------------------------------------------------------------------------
-# Chat UI
-# ----------------------------------------------------------------------------
-if file_upload:
-    chain = build_chain(st.session_state["persona"])  # persona‑specific prompt
+    temp_dir = tempfile.mkdtemp()
+    path = os.path.join(temp_dir, f"{session_id}_{file_upload.name}")
+    with open(path, "wb") as w:
+        w.write(file_upload.getvalue())
 
-    container = st.container(height=600, border=True)
-    for msg in st.session_state.chat_history:
-        avatar = "🤖" if msg["role"] == "assistant" else "🤔"
-        with container.chat_message(msg["role"], avatar=avatar):
-            st.markdown(msg["content"])
+    loader = PyPDFLoader(path)
+    docs = loader.load()
 
-    if user_input := st.chat_input("Type your question …"):
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-        container.chat_message("user", avatar="🤔").markdown(user_input)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=2048, chunk_overlap=128)
+    chunks = splitter.split_documents(docs)
 
-        with container.chat_message("assistant", avatar="🤖"):
-            with st.spinner("Thinking …"):
-                try:
-                    answer = chain.invoke(user_input)
-                except Exception as exc:
-                    st.error(f"Error: {exc}")
-                    raise
-                st.markdown(answer)
-        st.session_state.chat_history.append({"role": "assistant", "content": answer})
-        st.rerun()
+    st.session_state["vector_db"] = Chroma.from_documents(
+        documents=chunks, embedding=embeddings, collection_name=session_id
+    )
 
-# ----------------------------------------------------------------------------
-# Chat‑history download
-# ----------------------------------------------------------------------------
-if st.session_state.chat_history:
+    shutil.rmtree(temp_dir)
+
+# ---- Sidebar: temperature / persona ---------------------------
+st.sidebar.divider()
+st.session_state["temperature_value"] = st.sidebar.slider(
+    "LLM Model Temperature:", 0.05, 1.0, 0.5, 0.05
+)
+st.sidebar.write(
+    "Lower the temperature for responses that adhere strictly to your PDF content."
+)
+st.sidebar.divider()
+
+st.session_state["persona"] = st.sidebar.selectbox(
+    "Assistant's tone:", ("Friendly", "Formal", "Technical", "Concise"), index=2
+)
+st.sidebar.divider()
+
+# ---- Sidebar: maintenance buttons -----------------------------
+if st.sidebar.button("Delete PDF contents from vector DB"):
+    st.session_state.pop("vector_db", None)
+    st.sidebar.success("Collection deleted successfully.")
+
+if st.session_state.get("chat_history"):
+    chat_json = json.dumps(st.session_state.chat_history, indent=4)
     if st.sidebar.download_button(
-        "Download chat as JSON",
-        json.dumps(st.session_state.chat_history, indent=2),
-        file_name=f"History_{st.session_state.get('file_name', 'session')}_{datetime.now():%Y%m%d}.json",
+        "Download Chat History",
+        data=chat_json,
+        file_name=f"History_{st.session_state.get('file_name','')}_{datetime.now():%Y%m%d}.json",
         mime="application/json",
     ):
         st.balloons()
+
+# ---- Main chat container --------------------------------------
+if file_upload:
+    msg_container = st.container(height=600, border=True)
+    for m in st.session_state["chat_history"]:
+        avatar = "🤖" if m["role"] == "assistant" else "🤔"
+        with msg_container.chat_message(m["role"], avatar=avatar):
+            st.markdown(m["content"])
+
+    if prompt_text := st.chat_input("Enter a prompt here…"):
+        st.session_state["chat_history"].append(
+            {"role": "user", "content": prompt_text}
+        )
+        msg_container.chat_message("user", avatar="🤔").markdown(prompt_text)
+
+        with msg_container.chat_message("assistant", avatar="🤖"):
+            with st.spinner(":green[processing…]"):
+                if st.session_state["vector_db"] is not None:
+                    response_text = chain.invoke(prompt_text)
+                    st.markdown(response_text)
+                else:
+                    st.warning("Please upload a PDF file first.")
+
+        if st.session_state["vector_db"] is not None:
+            st.session_state["chat_history"].append(
+                {"role": "assistant", "content": response_text}
+            )
+            st.rerun()
