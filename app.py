@@ -1,42 +1,41 @@
-# ---------------------------------------------------------------
-# RAG Web‑app – Streamlit + LangChain + Hugging Face
-# ---------------------------------------------------------------
-# cloud‑only shim for sqlite3 → pysqlite3 (leave as‑is locally)
-__import__("pysqlite3")
-import sys
-sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+__import__('pysqlite3') ## line 1 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+import sys ## line 2 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3') ## line 3 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
 
-# -------------- stdlib / third‑party imports -------------------
-import chromadb
+import chromadb 
 chromadb.api.client.SharedSystemClient.clear_system_cache()
 
-import os, time, tempfile, shutil, uuid, json, requests, hashlib
-from datetime import datetime
+import os
 import streamlit as st
-from requests.exceptions import HTTPError
-from typing import Union                         # ✨ ensure forward‑ref exists
+import time
+import tempfile
+import shutil
+import hashlib
+import uuid
+import json
+from datetime import datetime
+import requests  
 
-# ✨ ensure Pydantic can resolve 'BaseCache' before model_rebuild
-from langchain_core.caches import BaseCache     # ✨ NEW IMPORT
-
-from langchain_community.llms import Cohere, HuggingFaceHub
-HuggingFaceHub.model_rebuild()                  # rebuild with all refs resolved
-
+from langchain_community.llms import Cohere
+from langchain_community.llms import HuggingFaceHub
 from langchain.prompts import HumanMessagePromptTemplate
 from langchain_core.messages import SystemMessage
 from langchain.memory import ConversationBufferMemory
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate,MessagesPlaceholder
 from langchain.schema import StrOutputParser
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+from langchain_community.vectorstores import Chroma
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# ---------------- Streamlit page settings ----------------------
+
+#setting streamlit main page configration
 st.set_page_config(
     page_title="RAG Webapp",
     layout="wide",
@@ -44,148 +43,169 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# -------------------------- API keys ---------------------------
-HF_TOKEN = st.secrets["API_TOKEN"]
+
+
+############################ LLM Model ###########################
+
+# hugging face model configration info:
+HF_TOKEN = st.secrets['API_TOKEN'] # add you hugging face token here
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
-# -------------------- Embeddings & Vector DB -------------------
 embeddings = HuggingFaceInferenceAPIEmbeddings(
     api_key=HF_TOKEN, model_name="BAAI/bge-base-en-v1.5"
 )
 
-session_id = str(uuid.uuid4())
-st.session_state["vector_db"] = Chroma(
-    embedding_function=embeddings, collection_name=session_id
-)
+print("Retrieving...")
+
+
+session_id = str(uuid.uuid4())  # a unique 36-char string for each online user # to have a separate database in chroma 
+
+#initializing a chroma vector database in the streamlit cached memory
+st.session_state["vector_db"] = Chroma( embedding_function=embeddings, collection_name= session_id )
+#define the retriever function
 retriever = st.session_state["vector_db"].as_retriever()
 
-# ------------------- Persona prompt templates ------------------
+
+
+# template = """ Answer the question based ONLY on the following context:
+#     {context}
+
+#     Question: {question}
+    
+#     If you don't know the answer, just say that you don't know, don't try to make up an answer.
+#     Only provide the answer from the {context}, nothing else.
+#     Add snippets of the context you used to answer the question.
+
+# """
+
+
+
+# Define persona-specific prompt templates
 persona_templates = {
     "Friendly": """Answer the question in a warm, conversational tone based ONLY on the following context:
     {context}
 
     Question: {question}
-
+    
     If you don't know the answer, just say that you don't know. Keep it friendly and approachable!
     """,
+    
     "Formal": """Answer the question in a professional and respectful tone based ONLY on the following context:
     {context}
 
     Question: {question}
-
+    
     If you don't know the answer, state it politely without making up any information.
     """,
+    
     "Technical": """Answer the question in a technical and detailed tone based ONLY on the following context:
     {context}
 
     Question: {question}
-
-    Provide accurate, in‑depth answers as applicable. Do not guess if the answer is not in the context.
+    
+    Provide accurate, in-depth answers as applicable. Do not guess if the answer is not in the context.
     """,
+    
     "Concise": """Answer the question briefly and to the point based ONLY on the following context:
     {context}
 
     Question: {question}
-
+    
     Keep responses short and straightforward. Only answer based on the context provided.
-    """,
+    """
 }
 
-# ---------------- Proxy helper utilities ----------------------
-
+# Function to fetch free proxies from an online source ## to be used on huggingface 'free API requests' if huggingface is giving "too many requests" 429 error
 def fetch_free_proxies():
     proxy_sources = [
         "https://www.proxy-list.download/api/v1/get?type=https",
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
-        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt",
+        "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
     ]
     proxies = []
     for url in proxy_sources:
         try:
-            resp = requests.get(url, timeout=5)
-            if resp.status_code == 200:
-                for p in resp.text.strip().split("\n"):
-                    proxies.append({"http": f"http://{p}", "https": f"http://{p}"})
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                proxy_list = response.text.strip().split('\n')
+                for proxy in proxy_list:
+                    proxies.append({"http": f"http://{proxy}", "https": f"http://{proxy}"})
         except Exception as e:
-            st.error(
-                f"Error grabbing proxy list (used for HF rate‑limit fallback): {e}"
-            )
+            st.error(f"Error in fetching some free proxies. They were supposed to be used for ditching the 'exceeding limit error' on huggingface 'free API' requests. {e}")
     return proxies
 
-
+# Function to test the free proxy for reliability and speed
 def test_proxy(proxy):
-    """Lightweight HEAD request to check if a proxy works and is fast."""
     test_url = "https://api-inference.huggingface.co/models"
+    # Using HEAD request to quickly check responsiveness without transferring full data
     try:
-        start = time.time()
-        r = requests.head(test_url, proxies=proxy, timeout=2)
-        return r.status_code == 200 and (time.time() - start) < 2
+        start_time = time.time()
+        response = requests.head(test_url, proxies=proxy, timeout=2)  # shorter timeout
+        latency = time.time() - start_time
+
+        # Check if status_code indicates success and latency is acceptable
+        if response.status_code == 200 and latency < 2:
+            return True
+        else:
+            return False
     except Exception:
         return False
 
-
-def retry_with_proxies(repo_id, model_kwargs):
-    """Return a HuggingFaceHub() instance that works through a free proxy."""
-    for proxy in fetch_free_proxies():
-        if not test_proxy(proxy):
-            continue
-        try:
-            return HuggingFaceHub(
-                repo_id=repo_id, model_kwargs=model_kwargs, proxies=proxy
-            )
-        except HTTPError as e:
-            if (
-                e.response is not None
-                and e.response.status_code == 429
-            ):
-                # keep trying other proxies
-                continue
-            raise
-    st.error(
-        "⚠️ Hugging Face free API rate‑limit hit and no usable proxy found. "
-        "Please try again later."
-    )
+# Function to handle API requests with retries using proxies
+def retry_with_proxies(repo_id, model_kwargs, prompt):
+    proxies = fetch_free_proxies()
+    for proxy in proxies:
+        if test_proxy(proxy):
+            try:
+                llm = HuggingFaceHub(
+                    repo_id=repo_id,
+                    model_kwargs=model_kwargs,
+                    proxies=proxy
+                )
+                return llm(prompt)  # Return the response if successful
+            except Exception as e:
+                if "429" in str(e):
+                    continue  # Try the next proxy
+    st.error("⚠️ Too many requests have been made by this streamlit server to huggingface 'free API' today. I also tried to use some free proxies to ditch huggingface, but the free proxies didn't work. Please try the app later.")
     st.stop()
 
-# ----------------------- LLM initialisation --------------------
-
+# Model Configuration with exception handling
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
-    "max_new_tokens": 256,
-    "repetition_penalty": 1.1,
-    "temperature": st.session_state.get("temperature_value", 0.5),
-    "top_p": 0.9,
-    "return_full_text": False,
+    "max_new_tokens": 256,  # Max response length
+    "repetition_penalty": 1.1,   #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses.
+    "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature (global randomness)
+    "top_p": 0.9,  # Nucleus sampling  #  letting the model consider a wider range of word randomness within local context (top_p : 0 to 1)
+    "return_full_text":False
 }
 
-llm = None
-
 try:
-    llm = HuggingFaceHub(repo_id=repo_id, model_kwargs=model_kwargs)
-except HTTPError as e:
-    if e.response is not None and e.response.status_code == 429:
-        st.warning(
-            "HF rate‑limit hit – trying to route through free proxies …"
-        )
-        llm = retry_with_proxies(repo_id, model_kwargs)
-    else:
-        st.error(f"LLM initialisation failed: {e}")
-        st.stop()
+    llm = HuggingFaceHub(
+        repo_id=repo_id,
+        model_kwargs=model_kwargs
+    )
 except Exception as e:
-    st.error(f"Unexpected error while creating the LLM: {e}")
-    st.stop()
+    if "429" in str(e):
+        st.write("⚠️ Too many requests have been made by this streamlit server to huggingface free API today. Let me try some find some free proxies and try on huggingface requests to ditch them :)")
+        llm = retry_with_proxies(repo_id, model_kwargs, None)
 
-if llm is None:
-    st.error("Could not create the LLM. Check your HF token or internet access.")
-    st.stop()
+# # Model Configration
+# llm = HuggingFaceHub(
+#     repo_id="huggingfaceh4/zephyr-7b-alpha",
+#     model_kwargs={
+#         "max_new_tokens":128, #max response length
+#         "repetition_penalty": 1.1, #parameter is used to discourage the language model from repeating the same words, phrases, or sentences in its responses
+#         "temperature": st.session_state.get('temperature_value',0.5), # to force the model to only answrer based on the pdf file, you can reduce the temperature
+#         "top_p": 0.9, #  letting the model consider a wider range of words (top_p : 0 to 1)
+#         "return_full_text":False}
+# )
 
-# ---------------------- Prompt & pipeline ----------------------
+# prompt = ChatPromptTemplate.from_template(template) # make the prompt template based on 'context' and 'question'
+prompt = ChatPromptTemplate.from_template(persona_templates[st.session_state.get('persona','Technical')])  # make the persona specific prompt template based on 'context' and 'question'
+output_parser = StrOutputParser() #output
 
-prompt = ChatPromptTemplate.from_template(
-    persona_templates[st.session_state.get("persona", "Technical")]
-)
-output_parser = StrOutputParser()
 
+#The main RAG pipeline from input to output to be called in future
 chain = (
     {
         "context": retriever.with_config(run_name="Docs"),
@@ -196,95 +216,148 @@ chain = (
     | output_parser
 )
 
-# -------------------------- UI layout --------------------------
-st.title("Chat with PDF")
 
+################################# WebApp ###################################
+st.title("Chat with PDF") # main page heading
+
+
+# Initialize chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# ---- Sidebar: upload PDF --------------------------------------
-file_upload = st.sidebar.file_uploader("Upload your PDF", type="pdf")
+
+#upload section in the sidebar
+file_upload = st.sidebar.file_uploader("Upload your PDF", type='pdf' )
 if file_upload:
-    st.session_state["file_name"] = file_upload.name
-    if "vector_db" in st.session_state:
+
+    #save the file name:
+    st.session_state['file_name'] = file_upload.name
+
+    #first empty the database at each upload
+    if 'vector_db' in st.session_state:
         del st.session_state["vector_db"]
 
-    st.session_state["vector_db"] = Chroma(
-        embedding_function=embeddings, collection_name=session_id
-    )
+    # then make a refresh database with chroma
+    st.session_state["vector_db"] = Chroma( embedding_function=embeddings, collection_name= session_id )
     retriever = st.session_state["vector_db"].as_retriever()
 
+    #save the file in an actual path (but temporary) before feeding to PyPDFLoader
     temp_dir = tempfile.mkdtemp()
-    path = os.path.join(temp_dir, f"{session_id}_{file_upload.name}")
+    path = os.path.join(temp_dir, session_id + '_' + file_upload.name)
+
     with open(path, "wb") as w:
         w.write(file_upload.getvalue())
+    
+    #load the pdf
+    print("Loading data ..")
+    data = PyPDFLoader(path)
+    content = data.load()
 
-    loader = PyPDFLoader(path)
-    docs = loader.load()
+    #chunk the data
+    print("Splitting data...")
+    splitter = RecursiveCharacterTextSplitter(chunk_size=2048,chunk_overlap=128)
+    chunks = splitter.split_documents(content)
+    embeddings = HuggingFaceInferenceAPIEmbeddings(
+        api_key=HF_TOKEN, model_name="BAAI/bge-base-en-v1.5"
+    )
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=2048, chunk_overlap=128)
-    chunks = splitter.split_documents(docs)
-
-    st.session_state["vector_db"] = Chroma.from_documents(
+    #add the embeddings and chunks to the vector db
+    print("Save to vector DB..")
+    st.session_state["vector_db"]  = Chroma.from_documents(
         documents=chunks, embedding=embeddings, collection_name=session_id
     )
 
-    shutil.rmtree(temp_dir)
+    print("vector DB Created..")
 
-# ---- Sidebar: temperature / persona ---------------------------
-st.sidebar.divider()
-st.session_state["temperature_value"] = st.sidebar.slider(
-    "LLM Model Temperature:", 0.05, 1.0, 0.5, 0.05
+    shutil.rmtree(temp_dir) #remove the temporary directory created for the file parsing
+
+
+st.sidebar.divider() # add a divider in the sidebar panel
+# Set up a temperature slider for the LLM model
+st.session_state['temperature_value'] = st.sidebar.slider(
+    "LLM Model Temperature:",
+    min_value=0.05,
+    max_value=1.0,
+    value=0.5,  # Default value
+    step=0.05
 )
-st.sidebar.write(
-    "Lower the temperature for responses that adhere strictly to your PDF content."
+st.sidebar.write('Note: Lower the temperature for responses that adhere strictly to your PDF content.')
+
+st.sidebar.divider() # add a divider in the sidebar panel
+
+
+st.session_state['persona'] = st.sidebar.selectbox(
+    "Assistant's tone:",
+    ("Friendly", "Formal", "Technical", "Concise"),
+    index=2  # Set default to "Concise" (0-based index, so "Technical" is 2)
 )
-st.sidebar.divider()
 
-st.session_state["persona"] = st.sidebar.selectbox(
-    "Assistant's tone:", ("Friendly", "Formal", "Technical", "Concise"), index=2
-)
-st.sidebar.divider()
+st.sidebar.divider() # add a divider in the sidebar panel
 
-# ---- Sidebar: maintenance buttons -----------------------------
-if st.sidebar.button("Delete PDF contents from vector DB"):
-    st.session_state.pop("vector_db", None)
-    st.sidebar.success("Collection deleted successfully.")
 
-if st.session_state.get("chat_history"):
-    chat_json = json.dumps(st.session_state.chat_history, indent=4)
+# Delete PDF contents from vector DB if possible
+delete_collection = st.sidebar.button("Delete PDF contents from vector DB")
+if delete_collection:
+    if 'vector_db' in st.session_state:
+        del st.session_state["vector_db"]
+        st.sidebar.success("Collection deleted successfully.")
+    else:
+        st.sidebar.error("No vector database found to delete.")
+
+
+# Download button to download chat history as JSON in OpenAI format
+if st.session_state.get('chat_history', []) != [] : # if there is a chat history:
+    
+    chat_history_json = json.dumps(st.session_state.chat_history, indent=4) # create the json file
+    
     if st.sidebar.download_button(
-        "Download Chat History",
-        data=chat_json,
-        file_name=f"History_{st.session_state.get('file_name','')}_{datetime.now():%Y%m%d}.json",
-        mime="application/json",
+        label="Download Chat History",
+        data=chat_history_json,
+        file_name= "History_" + st.session_state.get('file_name','') +'_'+ datetime.now().strftime("%Y%m%d") +".json", 
+        mime="application/json"
     ):
+        # Show balloons as soon as the download button is clicked
         st.balloons()
 
-# ---- Main chat container --------------------------------------
+
+
+### main chatting area 
 if file_upload:
-    msg_container = st.container(height=600, border=True)
-    for m in st.session_state["chat_history"]:
-        avatar = "🤖" if m["role"] == "assistant" else "🤔"
-        with msg_container.chat_message(m["role"], avatar=avatar):
-            st.markdown(m["content"])
 
-    if prompt_text := st.chat_input("Enter a prompt here…"):
-        st.session_state["chat_history"].append(
-            {"role": "user", "content": prompt_text}
-        )
-        msg_container.chat_message("user", avatar="🤔").markdown(prompt_text)
+    ## simple chat:
+    # prompt = st.text_input("Enter your prompt:")
+    # text_container = st.empty()
+    # if prompt:
+    #     response = chain.invoke(prompt) # call the chain pipeline and get the response from the model
+    #     st.write(response) # Print model's response in the webapp
 
-        with msg_container.chat_message("assistant", avatar="🤖"):
-            with st.spinner(":green[processing…]"):
-                if st.session_state["vector_db"] is not None:
-                    response_text = chain.invoke(prompt_text)
-                    st.markdown(response_text)
-                else:
-                    st.warning("Please upload a PDF file first.")
 
-        if st.session_state["vector_db"] is not None:
-            st.session_state["chat_history"].append(
-                {"role": "assistant", "content": response_text}
-            )
-            st.rerun()
+    ## Fancy chat box with history and scrolling:
+    message_container = st.container(height=600, border=True)
+
+    for message in st.session_state["chat_history"]:
+        avatar = "🤖" if message["role"] == "assistant" else "🤔"
+        with message_container.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Enter a prompt here..."):
+        try:
+            st.session_state["chat_history"].append({"role": "user", "content": prompt})
+            message_container.chat_message("user", avatar="🤔").markdown(prompt)
+
+            with message_container.chat_message("assistant", avatar="🤖"):
+                with st.spinner(":green[processing...]"):
+                    if st.session_state["vector_db"] is not None:
+                        response = chain.invoke(prompt) 
+                        st.markdown(response)
+                    else:
+                        st.warning("Please upload a PDF file first.")
+
+            if st.session_state["vector_db"] is not None:
+                st.session_state["chat_history"].append(
+                    {"role": "assistant", "content": response}
+                )
+                st.rerun()
+
+        except Exception as e:
+            st.error(e)
