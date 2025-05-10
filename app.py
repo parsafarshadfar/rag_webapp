@@ -1,34 +1,28 @@
-__import__('pysqlite3') ## line 1 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
-import sys ## line 2 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3') ## line 3 #comment these three lines if you are using it in local pc and dont want to deploy to cloud
+# ─── Cloud‑only SQLite shim ────────────────────────────────────────────────────
+__import__("pysqlite3")          # ⚠️ Comment these three lines if running locally
+import sys                       # ⚠️ Comment these three lines if running locally
+sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")  # ⚠️ Comment these if local
 
-import chromadb
-chromadb.api.client.SharedSystemClient.clear_system_cache()
-
-import os
-import streamlit as st
-import time
-import tempfile
-import shutil
-import hashlib
-import uuid
-import json
+# ─── Standard libs ─────────────────────────────────────────────────────────────
+import os, uuid, json, tempfile, shutil, warnings
 from datetime import datetime
-import requests   # still needed for PDF download during testing, leave it
 
+# ─── Third‑party libs ──────────────────────────────────────────────────────────
+import streamlit as st
+import chromadb
 from langchain_community.llms import HuggingFaceHub
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 from langchain.schema import StrOutputParser
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+chromadb.api.client.SharedSystemClient.clear_system_cache()
 
-# ────────────────────────────── Streamlit page config ─────────────────────────
+# ─── Streamlit page config ─────────────────────────────────────────────────────
 st.set_page_config(
     page_title="RAG Webapp",
     layout="wide",
@@ -36,24 +30,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ────────────────────────────── LLM & embeddings ─────────────────────────────
-HF_TOKEN = st.secrets['API_TOKEN']            # Hugging Face token
+# ─── Hugging Face embedding model (BAAI/bge‑base) ─────────────────────────────
+HF_TOKEN = st.secrets["API_TOKEN"]          # put your token in `.streamlit/secrets.toml`
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HF_TOKEN
 
 embeddings = HuggingFaceInferenceAPIEmbeddings(
-    api_key=HF_TOKEN,
-    model_name="BAAI/bge-base-en-v1.5",
+    api_key=HF_TOKEN, model_name="BAAI/bge-base-en-v1.5"
 )
 
-session_id = str(uuid.uuid4())               # isolate each user’s collection
-st.session_state["vector_db"] = Chroma(
-    embedding_function=embeddings,
-    collection_name=session_id,
-)
-retriever = st.session_state["vector_db"].as_retriever()
-
-# Persona‑specific prompt templates
-persona_templates = {
+# ─── Persona‑specific prompt templates ─────────────────────────────────────────
+PERSONA_TEMPLATES = {
     "Friendly": """Answer the question in a warm, conversational tone based ONLY on the following context:
     {context}
 
@@ -84,12 +70,75 @@ persona_templates = {
     """,
 }
 
-# ────────────────────────────── Hugging Face LLM ──────────────────────────────
+# ─── Session‑level objects ─────────────────────────────────────────────────────
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+if "temperature_value" not in st.session_state:
+    st.session_state.temperature_value = 0.5
+
+if "persona" not in st.session_state:
+    st.session_state.persona = "Technical"
+
+# ─── Sidebar controls ──────────────────────────────────────────────────────────
+file_upload = st.sidebar.file_uploader("Upload your PDF", type="pdf")
+
+st.session_state.temperature_value = st.sidebar.slider(
+    "LLM Model Temperature",
+    min_value=0.05,
+    max_value=1.0,
+    value=st.session_state.temperature_value,
+    step=0.05,
+)
+st.sidebar.write(
+    "Lower temperature → answers stick more closely to your PDF content."
+)
+
+st.session_state.persona = st.sidebar.selectbox(
+    "Assistant tone",
+    ("Friendly", "Formal", "Technical", "Concise"),
+    index=("Friendly", "Formal", "Technical", "Concise").index(
+        st.session_state.persona
+    ),
+)
+
+st.sidebar.divider()
+
+# Button to wipe vector DB (PDF contents)
+if st.sidebar.button("Delete PDF contents from vector DB"):
+    if "vector_db" in st.session_state:
+        del st.session_state["vector_db"]
+        st.sidebar.success("Collection deleted.")
+    else:
+        st.sidebar.error("No collection to delete.")
+
+# Button to download chat history
+if st.session_state.chat_history:
+    history_json = json.dumps(st.session_state.chat_history, indent=2)
+    st.sidebar.download_button(
+        label="Download Chat History",
+        data=history_json,
+        file_name=f"History_{datetime.now():%Y%m%d}.json",
+        mime="application/json",
+    )
+
+# ─── Unique session ID & Chroma collection ────────────────────────────────────
+session_id = st.session_state.get("session_id") or str(uuid.uuid4())
+st.session_state.session_id = session_id
+
+if "vector_db" not in st.session_state:
+    st.session_state.vector_db = Chroma(
+        embedding_function=embeddings,
+        collection_name=session_id,
+    )
+retriever = st.session_state.vector_db.as_retriever()
+
+# ─── Initialise LLM FIRST (before building chain) ─────────────────────────────
 repo_id = "huggingfaceh4/zephyr-7b-alpha"
 model_kwargs = {
     "max_new_tokens": 256,
     "repetition_penalty": 1.1,
-    "temperature": st.session_state.get("temperature_value", 0.5),
+    "temperature": st.session_state.temperature_value,
     "top_p": 0.9,
     "return_full_text": False,
 }
@@ -97,127 +146,85 @@ model_kwargs = {
 try:
     llm = HuggingFaceHub(repo_id=repo_id, model_kwargs=model_kwargs)
 except Exception as e:
-    st.error(f"🚫 Failed to initialise LLM: {e}")
-    st.stop()
+    st.error(f"🚫 Unable to initialise Hugging Face model: {e}")
+    st.stop()                           # Prevents NameError further down
 
-prompt = ChatPromptTemplate.from_template(
-    persona_templates[st.session_state.get("persona", "Technical")]
+# ─── Build prompt, parser, and chain ──────────────────────────────────────────
+prompt_tpl = ChatPromptTemplate.from_template(
+    PERSONA_TEMPLATES[st.session_state.persona]
 )
 output_parser = StrOutputParser()
 
-# Build the RAG chain
 chain = (
     {
         "context": retriever.with_config(run_name="Docs"),
         "question": RunnablePassthrough(),
     }
-    | prompt
+    | prompt_tpl
     | llm
     | output_parser
 )
 
-# ────────────────────────────── UI & helpers ─────────────────────────────────
+# ─── Main title ───────────────────────────────────────────────────────────────
 st.title("Chat with PDF")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-file_upload = st.sidebar.file_uploader("Upload your PDF", type="pdf")
-
-# Temperature slider
-st.session_state["temperature_value"] = st.sidebar.slider(
-    "LLM Model Temperature:",
-    0.05,
-    1.0,
-    0.5,
-    0.05,
-)
-st.sidebar.write(
-    "Note: Lower the temperature for responses that adhere strictly to your PDF content."
-)
-
-# Persona selector
-st.session_state["persona"] = st.sidebar.selectbox(
-    "Assistant's tone:",
-    ("Friendly", "Formal", "Technical", "Concise"),
-    index=2,
-)
-
-st.sidebar.divider()
-
-# Delete collection button
-if st.sidebar.button("Delete PDF contents from vector DB"):
-    if "vector_db" in st.session_state:
-        del st.session_state["vector_db"]
-        st.sidebar.success("Collection deleted successfully.")
-    else:
-        st.sidebar.error("No vector database found to delete.")
-
-# Download chat history
-if st.session_state.get("chat_history"):
-    history_json = json.dumps(st.session_state.chat_history, indent=4)
-    st.sidebar.download_button(
-        "Download Chat History",
-        history_json,
-        f"History_{st.session_state.get('file_name','')}_{datetime.now():%Y%m%d}.json",
-        "application/json",
-    )
-
-# ────────────────────────────── PDF handling ─────────────────────────────────
+# ─── Handle PDF upload ────────────────────────────────────────────────────────
 if file_upload:
-    st.session_state["file_name"] = file_upload.name
+    # Keep original name for history download
+    st.session_state.file_name = file_upload.name
 
-    # Refresh vector DB
-    if "vector_db" in st.session_state:
-        del st.session_state["vector_db"]
-
-    st.session_state["vector_db"] = Chroma(
+    # Reset collection on every new upload
+    del st.session_state.vector_db
+    st.session_state.vector_db = Chroma(
         embedding_function=embeddings, collection_name=session_id
     )
-    retriever = st.session_state["vector_db"].as_retriever()
+    retriever = st.session_state.vector_db.as_retriever()
 
-    # Save PDF to temp file
-    temp_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(temp_dir, f"{session_id}_{file_upload.name}")
-
+    # Persist file to temp dir (needed for PyPDFLoader)
+    tmp_dir = tempfile.mkdtemp()
+    pdf_path = os.path.join(tmp_dir, f"{session_id}_{file_upload.name}")
     with open(pdf_path, "wb") as f:
         f.write(file_upload.getvalue())
 
-    # Load and split
+    # Load, split, embed, store
     docs = PyPDFLoader(pdf_path).load()
-    chunks = RecursiveCharacterTextSplitter(chunk_size=2048, chunk_overlap=128).split_documents(docs)
-
-    # Re‑embed & store
-    st.session_state["vector_db"] = Chroma.from_documents(
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=2048, chunk_overlap=128
+    )
+    chunks = splitter.split_documents(docs)
+    st.session_state.vector_db = Chroma.from_documents(
         chunks, embeddings, collection_name=session_id
     )
-    shutil.rmtree(temp_dir)
+    shutil.rmtree(tmp_dir)
 
-# ────────────────────────────── Chat interface ───────────────────────────────
+# ─── Chat interface ───────────────────────────────────────────────────────────
 if file_upload:
     msg_container = st.container(height=600, border=True)
 
     # Display history
-    for m in st.session_state["chat_history"]:
+    for m in st.session_state.chat_history:
         avatar = "🤖" if m["role"] == "assistant" else "🤔"
         with msg_container.chat_message(m["role"], avatar=avatar):
             st.markdown(m["content"])
 
-    # New input
-    if prompt_text := st.chat_input("Enter a prompt here…"):
-        st.session_state["chat_history"].append({"role": "user", "content": prompt_text})
-        msg_container.chat_message("user", avatar="🤔").markdown(prompt_text)
+    # New prompt
+    if user_msg := st.chat_input("Enter a prompt here…"):
+        st.session_state.chat_history.append(
+            {"role": "user", "content": user_msg}
+        )
+        msg_container.chat_message("user", avatar="🤔").markdown(user_msg)
 
         with msg_container.chat_message("assistant", avatar="🤖"):
             with st.spinner("processing…"):
-                if st.session_state["vector_db"]:
-                    answer = chain.invoke(prompt_text)
+                if st.session_state.vector_db is not None:
+                    answer = chain.invoke(user_msg)
                     st.markdown(answer)
                 else:
                     st.warning("Please upload a PDF first.")
 
-        if st.session_state["vector_db"]:
-            st.session_state["chat_history"].append(
-                {"role": "assistant", "content": answer}
-            )
-            st.rerun()
+        st.session_state.chat_history.append(
+            {"role": "assistant", "content": answer}
+        )
+        st.rerun()
+else:
+    st.info("⬅️ Upload a PDF from the sidebar to start chatting.")
