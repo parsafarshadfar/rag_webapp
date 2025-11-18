@@ -1,5 +1,5 @@
 
-# 🤖 RAG Web Application - Chat with PDF using LLM
+# RAG Web Application - Chat with PDF using LLM
 
 This project is a conversational chatbot application built with **Streamlit** and powered by the **Zephyr-7B-α** language model. The chatbot can engage users in informative and dynamic conversations, using both text and structured data from uploaded PDF documents as context.                                                                                                                       
 
